@@ -1,0 +1,55 @@
+---
+title: "Siegle-Hw3"
+author: "Aaron_Siegle"
+date: "2026-09-27"
+output: html_document
+---
+
+```{r, message=FALSE}
+# load libraries
+library(spdep)
+library(sf)
+library(terra)
+library(spatialreg)
+library(viridis)
+library(data.table)
+library(spectralGP)
+```
+
+
+```{r}
+# Import the data
+pres_data_path <- "C:/Users/aasie/OneDrive/Documentos/GIS713-Homework3/Data/2016_US_County_Level_Presidential_Results.csv"
+acs_county_data_path <- "C:/Users/aasie/OneDrive/Documentos/GIS713-Homework3/Data/acs2015_county_data.csv"
+election_results <- fread(pres_data_path)
+acs_counties <- fread(acs_county_data_path)
+head(election_results)
+head(acs_counties)
+```
+```{r}
+# Look at column names in the datasets 
+colnames(acs_counties)
+colnames(election_results)
+print(nrow(acs_counties))
+print(nrow(election_results))
+```
+
+```{r}
+# Remove non-CONUS counties from both datasets 
+# print(unique(acs_counties$State))
+acs_counties <- acs_counties[!State == "Alaska" & 
+                            !State == "Hawai'i", 
+                            !State == "Puerto Rico"]
+election_results <- election_results[!state_abbr == "AK" & 
+                                    !state_abbr == "HI" & 
+                                    !state_abbr == "PR"]
+print(nrow(acs_counties))
+print(nrow(election_results))
+```
+
+
+```{r}
+# Spatial join between the two datasets
+
+```
+
