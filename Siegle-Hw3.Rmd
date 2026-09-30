@@ -34,11 +34,11 @@ print(nrow(acs_counties))
 print(nrow(election_results))
 ```
 
+
 ```{r}
 # Remove non-CONUS counties from both datasets 
-# print(unique(acs_counties$State))
 acs_counties <- acs_counties[!State == "Alaska" & 
-                            !State == "Hawai'i", 
+                            !State == "Hawaii" & 
                             !State == "Puerto Rico"]
 election_results <- election_results[!state_abbr == "AK" & 
                                     !state_abbr == "HI" & 
@@ -50,6 +50,39 @@ print(nrow(election_results))
 
 ```{r}
 # Spatial join between the two datasets
+election_counties <- merge(acs_counties,
+                           election_results,
+                           by.x="CensusId", 
+                           by.y="combined_fips", 
+                           all.x=TRUE, 
+                           all.y=TRUE
+                           )
+head(election_counties)
+colnames(election_counties)
+```
+
+```{r}
+# Create new variables 
+election_counties[, frac_non_citizen := 1 - (Citizen / TotalPop)][,
+                  frac_women := Women/TotalPop][,
+                  frac_nonwhite := 1 - (White/TotalPop)][,
+                  frac_voting := total_votes/TotalPop]
+head(election_counties)
+```
+
+```{r}
+# Subset only to specified variables
+election_counties_subset <- election_counties[, .SD, .SDcols = c(
+    "CensusId", "State", "County", 
+    "per_dem", "per_gop", "frac_voting", 
+    "frac_women", "frac_nonwhite", "frac_non_citizen", 
+    "Income", "Poverty", "ChildPoverty", "Professional"
+    )]
+colnames(election_counties_subset)
+```
+
+```{r}
+# Subset only to counties where all variables are complete 
 
 ```
 
