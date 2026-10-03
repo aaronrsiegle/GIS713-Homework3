@@ -21,10 +21,13 @@ library(spectralGP)
 # Import the data
 pres_data_path <- "C:/Users/aasie/OneDrive/Documentos/GIS713-Homework3/Data/2016_US_County_Level_Presidential_Results.csv"
 acs_county_data_path <- "C:/Users/aasie/OneDrive/Documentos/GIS713-Homework3/Data/acs2015_county_data.csv"
+us_county_shp_path <- "C:/Users/aasie/OneDrive/Documentos/GIS713-Homework3/cb_2015_us_county_20m/cb_2015_us_county_20m.shp"
+us_county <- st_read(us_county_shp_path)
 election_results <- fread(pres_data_path)
 acs_counties <- fread(acs_county_data_path)
 head(election_results)
 head(acs_counties)
+head(us_county)
 ```
 ```{r}
 # Look at column names in the datasets 
@@ -33,17 +36,30 @@ colnames(election_results)
 print(nrow(acs_counties))
 print(nrow(election_results))
 ```
+```{r}
+# Merge the US counties shapefile onto the US counties data frame
+# start here
+# us_county$GEOID <- as.integer(us_county$GEOID)
+cs_counties_spatial <- merge(
+  us_county, 
+  acs_counties,
+  by.x = "GEOID", 
+  by.y = "CensusId",
+  all.x = TRUE, 
+  all.y = TRUE
+)
+head(acs_counties_spatial)
+```
 
 
 ```{r}
 # Remove non-CONUS counties from both datasets 
-acs_counties <- acs_counties[!State == "Alaska" & 
-                            !State == "Hawaii" & 
-                            !State == "Puerto Rico"]
+acs_counties_spatial <- acs_counties_spatial[
+  !acs_counties_spatial$State %in% c("Alaska", "Hawaii", "Puerto Rico"), ]
 election_results <- election_results[!state_abbr == "AK" & 
                                     !state_abbr == "HI" & 
                                     !state_abbr == "PR"]
-print(nrow(acs_counties))
+print(nrow(acs_counties_spatial))
 print(nrow(election_results))
 ```
 
@@ -83,6 +99,22 @@ colnames(election_counties_subset)
 
 ```{r}
 # Subset only to counties where all variables are complete 
+election_counties_complete <- election_counties_subset[
+  complete.cases(election_counties_subset)
+]
+print(nrow(election_counties_subset))
+print(nrow(election_counties_complete))
+```
 
+```{r}
+names(election_counties_complete)
+sapply(election_counties_complete, function(x) class(x)[1])
+```
+
+
+```{r}
+# Question 2: Create a map with an appropriate divergent color ramp that shows the GOP vote fraction for each county
+election_counties_complete <- st_as_sf(as.data.frame(election_counties_complete))
+plot(election_counties_complete["per_gop"])
 ```
 
