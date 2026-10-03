@@ -14,6 +14,7 @@ library(spatialreg)
 library(viridis)
 library(data.table)
 library(spectralGP)
+library(RColorBrewer)
 ```
 
 
@@ -36,26 +37,11 @@ colnames(election_results)
 print(nrow(acs_counties))
 print(nrow(election_results))
 ```
-```{r}
-# Merge the US counties shapefile onto the US counties data frame
-# start here
-# us_county$GEOID <- as.integer(us_county$GEOID)
-cs_counties_spatial <- merge(
-  us_county, 
-  acs_counties,
-  by.x = "GEOID", 
-  by.y = "CensusId",
-  all.x = TRUE, 
-  all.y = TRUE
-)
-head(acs_counties_spatial)
-```
-
 
 ```{r}
 # Remove non-CONUS counties from both datasets 
-acs_counties_spatial <- acs_counties_spatial[
-  !acs_counties_spatial$State %in% c("Alaska", "Hawaii", "Puerto Rico"), ]
+acs_counties <- acs_counties[
+  !acs_counties$State %in% c("Alaska", "Hawaii", "Puerto Rico"), ]
 election_results <- election_results[!state_abbr == "AK" & 
                                     !state_abbr == "HI" & 
                                     !state_abbr == "PR"]
@@ -107,14 +93,37 @@ print(nrow(election_counties_complete))
 ```
 
 ```{r}
-names(election_counties_complete)
-sapply(election_counties_complete, function(x) class(x)[1])
+# Question 2: Create a map with an appropriate divergent color ramp that shows the GOP vote fraction for each county
+# Join in the spatial attributes from the shapefile
+us_county$FIPS <- as.numeric(paste0(us_county$STATEFP, us_county$COUNTYFP))
+us_county$FIPS <- as.integer(us_county$FIPS)
+election_counties_complete <- as.data.frame(election_counties_complete)
+acs_counties_spatial <- merge(
+  us_county, 
+  election_counties_complete,
+  by.x = "FIPS", 
+  by.y = "CensusId",
+  all.x = TRUE,
+  all.y = TRUE
+)
+head(acs_counties_spatial)
 ```
-
 
 ```{r}
-# Question 2: Create a map with an appropriate divergent color ramp that shows the GOP vote fraction for each county
-election_counties_complete <- st_as_sf(as.data.frame(election_counties_complete))
-plot(election_counties_complete["per_gop"])
+plot(acs_counties_spatial["per_gop"], 
+     breaks = seq(0,1, length.out=11),
+     pal = rev(brewer.pal(10, "RdBu")), 
+     main = "GOP Vote Fraction by County", 
+     xlim = c(-125, -66), ylim = c(24, 50),
+     border = NA
+     )
 ```
+
+```{r}
+# Question 3: Explain the variation in county-level GOP vote share using the covariates. Test for spatial dependence and fit a spatial regression variant if necessary (use lm.morantest rather than moran.test).
+# Build nearest neighbors 
+nb <- poly2nb()
+```
+
+
 
