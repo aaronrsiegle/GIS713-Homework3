@@ -119,11 +119,69 @@ plot(acs_counties_spatial["per_gop"],
      )
 ```
 
-```{r}
+```{r,warning=FALSE}
 # Question 3: Explain the variation in county-level GOP vote share using the covariates. Test for spatial dependence and fit a spatial regression variant if necessary (use lm.morantest rather than moran.test).
 # Build nearest neighbors 
-nb <- poly2nb()
+nb <- poly2nb(acs_counties_spatial, queen = TRUE)
+lw <- nb2listw(nb, style = "W", zero.policy = TRUE)
+summary(nb)
 ```
 
+```{r}
+# Using lm.morantest to test for spatial autocorrelation 
+m0 <- lm(per_gop ~ 1, data = acs_counties_spatial)
+lm.morantest(m0, lw, zero.policy = TRUE)
 
+m1 <- lm(per_gop ~ frac_women + frac_nonwhite + frac_non_citizen + 
+           frac_voting + Income + Poverty + ChildPoverty + Professional, 
+         data = acs_counties_spatial)
+lm.morantest(m1, lw, zero.policy = TRUE)
+```
+
+```{r}
+# Moran's I is significant, which violates the assumption of spatial autocorrelation, meaning that we to choose a spatial regression variant 
+lm.RStests(m1, lw, test= c("RSerr", "RSlag", "adjRSerr", "adjRSlag"), 
+           zero.policy = TRUE)
+
+# Running the spatial error model 
+sem <- errorsarlm(formula(m1), data = acs_counties_spatial, listw = lw, 
+                  zero.policy = TRUE)
+summary(sem)
+
+# Running the spatial lag model
+slm <- lagsarlm(formula(m1), data = acs_counties_spatial, listw = lw, 
+                  zero.policy = TRUE)
+summary(slm)
+```
+Here we would use the spatial lag model because even though the two models have the same value p-value, the spatial lag model has the lower AIC value, which means that the spatial lag model has a higher accuracy when compared to the spatial error model. Both models have a high AIC because I used all of the other variables in the model as covariates, which made the model more complex. While this may improve the overall predictive power of the model, it reduces the incremental gain in model accuracy for each variable, thus inflating the AIC. 
+
+```{r}
+# Question 4: Create maps of the residuals for the OLS model as well as the two spatial variants. Create a table that compares the coefficient values and standard errors between the models.
+# Extract the residuals for each model 
+ols_resid <- resid(m1)
+sem_resid <- resid(sem)
+slm_resid <- resid(slm)
+
+# Create three maps that are side by side 
+par(mfrow = c(1,3))
+
+plot(ols_resid, 
+     breaks = seq(0,1, length.out=11),
+     pal = rev(brewer.pal(10, "RdBu")), 
+     main = "OLS Model Residuals for Predicting\nGOP Vote Fraction by County", 
+     xlim = c(-125, -66), ylim = c(24, 50),
+     border = NA)
+plot(sem_resid, 
+     breaks = seq(0,1, length.out=11),
+     pal = rev(brewer.pal(10, "RdBu")), 
+     main = "Spatial Error Model Residuals for Predicting\nGOP Vote Fraction by County", 
+     xlim = c(-125, -66), ylim = c(24, 50),
+     border = NA)
+plot(slm_resid, 
+     breaks = seq(0,1, length.out=11),
+     pal = rev(brewer.pal(10, "RdBu")), 
+     main = "Spatial Lag Model Residuals for Predicting\nGOP Vote Fraction by County", 
+     xlim = c(-125, -66), ylim = c(24, 50),
+     border = NA)
+```
 
