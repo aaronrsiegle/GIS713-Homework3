@@ -158,30 +158,36 @@ Here we would use the spatial lag model because even though the two models have 
 ```{r}
 # Question 4: Create maps of the residuals for the OLS model as well as the two spatial variants. Create a table that compares the coefficient values and standard errors between the models.
 # Extract the residuals for each model 
-ols_resid <- resid(m1)
-sem_resid <- resid(sem)
-slm_resid <- resid(slm)
+dat <- acs_counties_spatial[complete.cases(st_drop_geometry(acs_counties_spatial)[, vars]), ]
+dat <- st_make_valid(dat)
+dat$ols_resid <- resid(m1)
+dat$sem_resid <- resid(sem)
+dat$slm_resid <- resid(slm)
 
 # Create three maps that are side by side 
-par(mfrow = c(1,3))
+lim <- max(abs(c(dat$ols_resid, 
+                 dat$sem_resid,
+                 dat$slm_resid)))
+brks <- seq(-lim, lim, length.out = 11)
+cols <- rev(brewer.pal(10, "RdBu"))
 
-plot(ols_resid, 
-     breaks = seq(0,1, length.out=11),
-     pal = rev(brewer.pal(10, "RdBu")), 
-     main = "OLS Model Residuals for Predicting\nGOP Vote Fraction by County", 
-     xlim = c(-125, -66), ylim = c(24, 50),
+map_resid <- function(x, title) {
+  plot(st_geometry(dat), 
+       col = cols[cut(x, brks, include.lowest = TRUE)], 
+       main = title,
+       xlim = c(-125, -66), ylim = c(24, 50),
      border = NA)
-plot(sem_resid, 
-     breaks = seq(0,1, length.out=11),
-     pal = rev(brewer.pal(10, "RdBu")), 
-     main = "Spatial Error Model Residuals for Predicting\nGOP Vote Fraction by County", 
-     xlim = c(-125, -66), ylim = c(24, 50),
-     border = NA)
-plot(slm_resid, 
-     breaks = seq(0,1, length.out=11),
-     pal = rev(brewer.pal(10, "RdBu")), 
-     main = "Spatial Lag Model Residuals for Predicting\nGOP Vote Fraction by County", 
-     xlim = c(-125, -66), ylim = c(24, 50),
-     border = NA)
+}
+
+par(mfrow = c(1,3), mar= c(0,0,3,0))
+map_resid(acs_counties_spatial$ols_resid, "OLS Residuals")
+map_resid(acs_counties_spatial$sem_resid, "Spatial Error Model Residuals")
+map_resid(acs_counties_spatial$slm_resid, "Spatial Lag Model Residuals")
+
+legend("bottomleft", 
+       legend = levels(cut(0, brks, include.lowest = TRUE)), 
+       fill = cols, cex = 0.5, bty = "n", title = "Residuals")
+
+par(mfrow = c(1,1))
 ```
 
