@@ -135,7 +135,11 @@ lm.morantest(m0, lw, zero.policy = TRUE)
 m1 <- lm(per_gop ~ frac_women + frac_nonwhite + frac_non_citizen + 
            frac_voting + Income + Poverty + ChildPoverty + Professional, 
          data = acs_counties_spatial)
-lm.morantest(m1, lw, zero.policy = TRUE)
+ols_moran <- lm.morantest(m1, lw, zero.policy = TRUE)
+
+ols_coefs <- summary(m1)$coefficients
+ols_est <- ols_coefs[, "Estimate"]
+ols_se <- ols_coefs[, "Std. Error"]
 ```
 
 ```{r}
@@ -143,26 +147,37 @@ lm.morantest(m1, lw, zero.policy = TRUE)
 lm.RStests(m1, lw, test= c("RSerr", "RSlag", "adjRSerr", "adjRSlag"), 
            zero.policy = TRUE)
 
+
 # Running the spatial error model 
 sem <- errorsarlm(formula(m1), data = acs_counties_spatial, listw = lw, 
                   zero.policy = TRUE)
 summary(sem)
+sem_coefs <- summary(sem)$Coef
+sem_est <- sem_coefs[, "Estimate"]
+sem_se <- sem_coefs[, "Std. Error"]
 
 # Running the spatial lag model
 slm <- lagsarlm(formula(m1), data = acs_counties_spatial, listw = lw, 
                   zero.policy = TRUE)
 summary(slm)
+slm_coefs <- summary(slm)$Coef
+slm_est <- slm_coefs[, "Estimate"]
+slm_se <- slm_coefs[, "Std. Error"]
 ```
 Here we would use the spatial lag model because even though the two models have the same value p-value, the spatial lag model has the lower AIC value, which means that the spatial lag model has a higher accuracy when compared to the spatial error model. Both models have a high AIC because I used all of the other variables in the model as covariates, which made the model more complex. While this may improve the overall predictive power of the model, it reduces the incremental gain in model accuracy for each variable, thus inflating the AIC. 
 
 ```{r}
 # Question 4: Create maps of the residuals for the OLS model as well as the two spatial variants. Create a table that compares the coefficient values and standard errors between the models.
-# Extract the residuals for each model 
+# Data that OLS acts upon 
+vars <- c("per_gop", "frac_women", "frac_nonwhite", "frac_non_citizen",
+          "frac_voting", "Income", "Poverty", "ChildPoverty", "Professional")
 dat <- acs_counties_spatial[complete.cases(st_drop_geometry(acs_counties_spatial)[, vars]), ]
 dat <- st_make_valid(dat)
-dat$ols_resid <- resid(m1)
-dat$sem_resid <- resid(sem)
-dat$slm_resid <- resid(slm)
+
+# Extract the residuals for each model 
+dat$ols_resid <- as.numeric(resid(m1))
+dat$sem_resid <- as.numeric(resid(sem))
+dat$slm_resid <- as.numeric(resid(slm))
 
 # Create three maps that are side by side 
 lim <- max(abs(c(dat$ols_resid, 
@@ -175,19 +190,31 @@ map_resid <- function(x, title) {
   plot(st_geometry(dat), 
        col = cols[cut(x, brks, include.lowest = TRUE)], 
        main = title,
-       xlim = c(-125, -66), ylim = c(24, 50),
-     border = NA)
+       border = NA)
 }
 
-par(mfrow = c(1,3), mar= c(0,0,3,0))
-map_resid(acs_counties_spatial$ols_resid, "OLS Residuals")
-map_resid(acs_counties_spatial$sem_resid, "Spatial Error Model Residuals")
-map_resid(acs_counties_spatial$slm_resid, "Spatial Lag Model Residuals")
+par(mfrow = c(3,1), mar= c(0,0,3,0))
+map_resid(dat$ols_resid, "OLS Residuals")
+map_resid(dat$sem_resid, "Spatial Error Model Residuals")
+map_resid(dat$slm_resid, "Spatial Lag Model Residuals")
 
-legend("bottomleft", 
+legend("left", 
        legend = levels(cut(0, brks, include.lowest = TRUE)), 
-       fill = cols, cex = 0.5, bty = "n", title = "Residuals")
+       fill = cols, cex = 0.7, bty = "n", title = "Residuals")
 
 par(mfrow = c(1,1))
+```
+
+```{r}
+# Create a table that compares the coefficient values and standard errors between the models.
+coef_table <- data.frame(
+  Term     = rownames(ols_coefs),
+  OLS_Est  = ols_est, OLS_SE = ols_se,
+  SEM_Est  = sem_est, SEM_SE = sem_se,
+  SLM_Est  = slm_est, SLM_SE = slm_se,
+  row.names = NULL
+)
+coef_table[, -1] <- round(coef_table[, -1], 4)
+coef_table
 ```
 
