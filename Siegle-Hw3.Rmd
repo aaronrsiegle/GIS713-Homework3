@@ -46,7 +46,7 @@ acs_counties <- acs_counties[
 election_results <- election_results[!state_abbr == "AK" & 
                                     !state_abbr == "HI" & 
                                     !state_abbr == "PR"]
-print(nrow(acs_counties_spatial))
+print(nrow(acs_counties))
 print(nrow(election_results))
 ```
 
@@ -222,58 +222,39 @@ coef_table
 ```{r, warning=FALSE}
 # Question 5: Fit a geographically weighted regression. Create maps w/ divergent color ramps that depict each of the effects on county-level GOP vote share.
 
-# Finding the centroid of each county
-cent   <- st_centroid(st_geometry(dat))
-coords <- st_coordinates(cent)
+pred_vars <- setdiff(vars, "per_gop")
+f <- per_gop ~ frac_women + frac_nonwhite + frac_non_citizen +
+  frac_voting + Income + Poverty + ChildPoverty + Professional
 
-# Making a data frame without the geometry so it can be read by spgwr 
+dat_proj <- st_transform(dat, 5070)
+coords   <- st_coordinates(st_centroid(st_geometry(dat_proj)))
+
 dat_df <- st_drop_geometry(dat)
+dat_df[pred_vars] <- lapply(dat_df[pred_vars], function(x) as.numeric(scale(x)))
 
-# Making a variable for all the predictive variables 
-f <- per_gop~frac_women + frac_nonwhite + frac_non_citizen + 
-           frac_voting + Income + Poverty + ChildPoverty + Professional
-
-# Optimal bandwidth
-optim_bw <- gwr.sel(f, 
-                    data = dat_df,
-                    coords = coords,
-                    adapt = TRUE,
-                    longlat = isTRUE(st_is_longlat(dat)))
-
-gop_gwr <- gwr(f,
-                    data = dat_df,
-                    coords = coords,
-                    bandwidth = optim_bw, 
-                    hatmatrix = TRUE, 
-                    longlat = isTRUE(st_is_longlat(dat)))
+gop_gwr <- gwr(f, data = dat_df, coords = coords,
+               adapt = 0.05,
+               hatmatrix = FALSE, longlat = FALSE)
+saveRDS(gop_gwr, "gop_gwr.rds")
 
 ```
+
+
 ```{r}
 # Create maps w/ divergent color ramps that depict each of the effects on county-level GOP vote share.
 res <- as.data.frame(gop_gwr$SDF)
-predictors <- setdiff(vars, "per_gop")
+sapply(res[, pred_vars], function(x) sum(is.finite(x)))   
 
-dat$localR2 <- res$localR2
-plot(dat["localR2"], border = NA, main = "GWR Local R²")
-
-# Creating a for loop to plot all of the predictive variables 
-for (v in predictors) {
+for (v in pred_vars) {
   b <- res[[v]]
-
-  if (is.null(b) || !any(is.finite(b))) {
-    message("Skipping ", v, ": no finite local coefficients")
-    next
-  }
-
   b[!is.finite(b)] <- NA
   dat[[paste0("b_", v)]] <- b
   lim <- max(abs(b), na.rm = TRUE)
 
-  plot(dat[paste0("b_", v)],
-       border = NA,
+  plot(dat[paste0("b_", v)], border = NA,
        breaks = seq(-lim, lim, length.out = 11),
        pal = rev(brewer.pal(10, "RdBu")),
-       main = paste("Local coefficient:", v))
-}
+       main = paste("Effect of", v, "on per_gop"))}
+  
 ```
 
